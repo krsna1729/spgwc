@@ -11,45 +11,51 @@ import (
 
 	"github.com/pkg/errors"
 
-	goipam "github.com/metal-pod/go-ipam"
+	v1 "github.com/wmnsk/go-gtp/v1"
 	v2 "github.com/wmnsk/go-gtp/v2"
 	"github.com/wmnsk/go-gtp/v2/messages"
+
+	goipam "github.com/metal-pod/go-ipam"
 )
 
 type ipam struct {
 	*goipam.Ipamer
-	prefixes []*goipam.Prefix
 }
 
 type spgwc struct {
-	cConn *v2.Conn
-	cfg   *Config
-	errCh chan error
+	cConn  *v2.Conn
+	uConns map[string]*v1.UPlaneConn
+	cfg    *Config
+	errCh  chan error
 	ipam
 }
 
 func newSPGWC(cfg *Config) (*spgwc, error) {
 	p := &spgwc{
-		errCh: make(chan error, 1),
-		cfg:   cfg,
+		uConns: make(map[string]*v1.UPlaneConn),
+		errCh:  make(chan error, 1),
+		cfg:    cfg,
 	}
 
 	p.ipam.Ipamer = goipam.New()
-	prefix, err := p.ipam.NewPrefix(cfg.UESubnet)
+	_, err := p.ipam.NewPrefix(cfg.UESubnet)
 	if err != nil {
 		return nil, err
 	}
-	p.prefixes = append(p.prefixes, prefix)
 
 	return p, nil
 }
 
 func (p *spgwc) run(ctx context.Context) error {
+	for _, u := range p.cfg.UPFs {
+		p.initUPlane(u.S1UAddr)
+	}
+
 	cAddr, err := net.ResolveUDPAddr("udp", p.cfg.S11Addr)
 	if err != nil {
 		return err
 	}
-	p.cConn = v2.NewConn(cAddr, 0)
+	p.cConn = v2.NewConn(cAddr, v2.IFTypeS11S4SGWGTPC, 0)
 	go func() {
 		if err := p.cConn.ListenAndServe(ctx); err != nil {
 			log.Println(err)
@@ -90,7 +96,32 @@ func (p *spgwc) close() error {
 	return nil
 }
 
-func (p *spgwc) setupUPlane(peerIP, msIP net.IP, otei, itei uint32) error {
+func (p *spgwc) getSubscriberIP(subnet string) (string, error) {
+	ip, err := p.AcquireIP(subnet)
+	if err != nil {
+		return "", err
+	}
+	return ip.IP.String(), nil
+}
 
+func (p *spgwc) initUPlane(s1uAddr string) error {
+	// TODO: Connect to dataplane
+	s1u, err := net.ResolveUDPAddr("udp", s1uAddr)
+	if err != nil {
+		return err
+	}
+	p.uConns[s1uAddr] = v1.NewUPlaneConn(s1u)
 	return nil
+}
+
+func (p *spgwc) setupUPlane(peerIP, msIP net.IP, otei, itei uint32) error {
+	log.Println(peerIP, msIP, otei, itei)
+	return nil
+}
+
+func (p *spgwc) selectUPlane() string {
+	for k, _ := range p.uConns {
+		return k
+	}
+	return ""
 }

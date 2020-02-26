@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -19,7 +20,13 @@ func main() {
 	flag.Parse()
 	log.SetPrefix("[S/PGW-C] ")
 
-	cfg, err := loadConfig(*configPath)
+	f, err := os.Open(*configPath)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer f.Close()
+	var r io.Reader = f
+	cfg, err := loadConfig(r)
 	if err != nil {
 		log.Println(err)
 		return

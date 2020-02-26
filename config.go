@@ -5,7 +5,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 
 	"gopkg.in/yaml.v2"
@@ -23,14 +23,9 @@ type Config struct {
 	} `yaml:"upfs,flow"`
 }
 
-func loadConfig(path string) (*Config, error) {
-	buf, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
+func loadConfig(r io.Reader) (*Config, error) {
 	c := &Config{}
-	if err := yaml.Unmarshal(buf, c); err != nil {
+	if err := yaml.NewDecoder(r).Decode(c); err != nil {
 		return nil, err
 	}
 	log.Println(c)
