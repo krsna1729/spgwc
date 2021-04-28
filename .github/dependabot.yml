@@ -1,0 +1,21 @@
+version: 2
+updates:
+- package-ecosystem: gomod
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: github.com/wmnsk/go-gtp
+    versions:
+    - 0.7.15
+    - 0.7.16
+    - 0.7.17
+    - 0.7.18
+    - 0.7.20
+  - dependency-name: github.com/metal-stack/go-ipam
+    versions:
+    - 1.8.0
+    - 1.8.1
+    - 1.8.2
+    - 1.8.3
